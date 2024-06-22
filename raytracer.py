@@ -70,6 +70,29 @@ class Material(ABC):
     @abstractmethod
     def scatter(ray: Ray, hitrec: HitRecord):
         return
+
+class Glass(Material):
+    def __init__(self,color, refractive_index):
+        self.albedo = color
+        self.refractive_index = refractive_index
+    def scatter(self, ray, hitrec):
+        r = (1.0/self.refractive_index) if hitrec.front_face else self.refractive_index
+        direction = ray.direction/np.linalg.norm(ray.direction)
+        cos_theta = min(np.dot(-direction, hitrec.normal),1)
+        sin_theta = np.sqrt(1.0 - cos_theta**2)
+        r0 = (1-r)/(1+r)
+        r0=r0**2
+        r0=r0 + (1-r0)*np.float_power(1-cos_theta, 5)
+        if(r*sin_theta>1.0 or r0>np.random.rand()):
+            direction = direction - 2*np.dot(ray.direction,hitrec.normal)
+        else:
+            
+            r_perp = r*(direction+cos_theta*hitrec.normal)
+            r_parallel = -np.sqrt(np.abs(1.0-r_perp**2))*hitrec.normal
+            direction = r_perp+r_parallel
+
+        return Ray(hitrec.point, direction)
+
     
 class Lambertian(Material):
     def __init__(self,color):
@@ -173,8 +196,8 @@ class HittableList(Hittable):
 class Camera:
     maxdepth = 10
     def __init__(self):
-        self.image_height = 480
-        self.image_width = 480
+        self.image_height = 720
+        self.image_width = 720
 
         focal_length = 1.0
         viewport_width = 2.0
@@ -195,7 +218,7 @@ class Camera:
         self.pixel_centers = pixel00_locations+indices_i*self.pixel_delta_u+ indices_j*self.pixel_delta_v
     
     def aliased_ray(self,vector, hitabbleObjects):
-        samples_per_pixel = 5
+        samples_per_pixel = 10
         a = np.random.uniform(-0.5, 0.5, size=samples_per_pixel)
         b = np.random.uniform(-0.5, 0.5, size=samples_per_pixel)
         c = np.zeros_like(a)
@@ -260,7 +283,7 @@ class Camera:
 
 raytracer = Camera()
 
-image_array = raytracer.render([Sphere(np.array([0,0,-2]), 0.5, Metal(np.array([0.7,0.9,0.6]), 0.1)), Sphere(np.array((0,-1000.5,-1)), 1000, Metal(np.array([0.5,0.7,0.8]), 0.5)), Sphere(np.array([0.2,0.7,-1]), 0.2,Metal(np.array([0.7,0.9,0.5]), 0.6))])
+image_array = raytracer.render([Sphere(np.array([0,0,-2]), 0.5, Metal(np.array([0.7,0.9,0.6]), 0.1)), Sphere(np.array((0,-1000.5,-1)), 1000, Metal(np.array([0.5,0.7,0.8]), 0.5)), Sphere(np.array([0.2,0.7,-1]), 0.2,Metal(np.array([0.7,0.9,0.5]), 0.6)), Sphere(np.array([-0.3,0.4,-3]), 2,Glass(np.array([1.2,0.8,0.8]), 2.5)), Sphere(np.array([-0.3,0.4,-1.3]), 0.5,Glass(np.array([1,1,1]), 0.2))])
 image_array*=255
 print(image_array)
 image = Image.fromarray(image_array.astype(np.uint8))
